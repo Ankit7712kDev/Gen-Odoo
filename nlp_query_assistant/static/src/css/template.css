@@ -1,0 +1,23 @@
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+}
+th {
+  background: linear-gradient(to right, #2563EB, #1E40AF);
+  color: white;
+  padding: 12px 10px;
+  text-align: left;
+  font-weight: 600;
+}
+td {
+  padding: 10px;
+  border-bottom: 1px solid #E5E7EB;
+  color: #374151;
+}
+tr:hover td {
+  background-color: #F3F4F6;
+}

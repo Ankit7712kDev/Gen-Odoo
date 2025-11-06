@@ -1,0 +1,295 @@
+<odoo>
+    <template id="nlp_query_page" name="NLP Query Assistant Chat UI">
+        <t t-call="web.basic_layout">
+
+            <!-- ✅ Full width container override -->
+            <div id="nlp_app"
+                 class="d-flex"
+                 style="height: 100vh; width: 100vw; margin: 0; padding: 0; background-color: #f4f6f9; overflow: hidden; position: fixed; top: 0; left: 0;">
+
+                <!-- Sidebar -->
+                <div id="sidebar"
+                     style="width: 260px; background-color: #1e1e2f; color: white; display: flex; flex-direction: column;">
+                    <div class="p-3 border-bottom text-center" style="background-color: #4a4a59;">
+                        <h4 class="mb-0"
+                            style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <img src="/nlp_query_assistant/static/description/icon_8.png"
+                                 alt="icon"
+                                 width="36"
+                                 height="36"
+                                 />
+                            Odoo Queries
+                        </h4>
+                    </div>
+                    <div id="history_list" style="flex-grow: 1; overflow-y: auto; padding: 10px;"></div>
+                </div>
+
+                <!-- Main Chat Area -->
+                <div id="main_area" class="flex-grow-1 d-flex flex-column justify-content-between"
+                     style="background-color: #f8f9fb; width: calc(100vw - 260px);">
+
+                    <!-- Chat content -->
+                    <div id="chat_container" style="flex-grow: 1; overflow-y: auto; padding: 20px;">
+                        <div class="text-center text-muted mt-5">
+                            <h4>Welcome to NLP OQuery Assistant</h4>
+                            <p>Ask your Odoo in natural language — e.g.
+                                <i>"Show all purchase orders for Aka Foster"</i>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Input section -->
+                    <div id="input_section" class="p-3 border-top bg-white d-flex align-items-center"
+                         style="box-shadow: 0 -2px 8px rgba(0,0,0,0.1);">
+                        <input type="text" id="query_input" class="form-control me-2 rounded-pill px-4"
+                               placeholder="Type your query here..." style="flex: 1; height: 48px;"/>
+                        <button id="run_query" class="btn btn-gradient px-4 py-2 rounded-pill text-white">Run Query
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Styles -->
+            <style>
+                /* ✅ Force full-page layout */
+                body.o_web_client,
+                .o_web_client .o_action_manager,
+                .o_web_client .o_action {
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+                background-color: #f4f6f9;
+                }
+
+                body.o_web_client > footer {
+                display: none !important;
+                }
+
+                .btn-gradient {
+                background: linear-gradient(135deg, #8c158c 0%, #800080 100%);
+                border: 2px solid rgba(255, 255, 255, 0.7); /* ✅ Thin semi-transparent white border */
+                box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.3),
+                0 4px 10px rgba(101, 91, 255, 0.3);
+                transition: all 0.3s ease;
+                color: #fff !important;
+                }
+
+                .btn-gradient:hover {
+                transform: translateY(-2px);
+                box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.5),
+                0 6px 15px rgba(128, 0, 128, 0.5);
+                border-color: #fff; /* ✅ Make border fully white on hover */
+                }
+
+
+                .chat-bubble {
+                max-width: 90%;
+                margin-bottom: 15px;
+                padding: 12px 18px;
+                border-radius: 18px;
+                font-size: 15px;
+                animation: fadeIn 0.3s ease-in-out;
+                word-wrap: break-word;
+                }
+
+                .chat-user {
+                align-self: flex-end;
+                background: #800080;
+                color: white;
+                border-bottom-right-radius: 4px;
+                }
+
+                .chat-bot {
+                align-self: flex-start;
+                background: #ffffff;
+                color: #212529;
+                border-bottom-left-radius: 4px;
+                box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+                }
+
+                #history_list div {
+                cursor: pointer;
+                padding: 10px 12px;
+                border-radius: 6px;
+                margin-bottom: 6px;
+                transition: background 0.2s;
+                background-color: #2b2c3b;
+                font-size: 14px;
+                }
+
+                #history_list div:hover {
+                background-color: #3c3e52;
+                }
+
+                @keyframes fadeIn {
+                from {opacity: 0; transform: translateY(5px);}
+                to {opacity: 1; transform: translateY(0);}
+                }
+
+                /* ✅ Table Styling (improved for full width) */
+                .chat-bot table {
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 13.5px;
+                background-color: #fff;
+                margin-top: 10px;
+                border-radius: 8px;
+                overflow: hidden;
+                }
+
+                .chat-bot th {
+                background-color: #800080;
+                color: white;
+                text-align: left;
+                padding: 8px;
+                }
+
+                .chat-bot td {
+                padding: 6px 8px;
+                border-bottom: 1px solid #e5e7eb;
+                }
+
+                .chat-bot tr:nth-child(even) {
+                background-color: #f9fafb;
+                }
+
+                .chat-bot tr:hover {
+                background-color: #eef2ff;
+                }
+            </style>
+
+            <!-- JS Logic (unchanged) -->
+            <script type="text/javascript">
+                <![CDATA[
+    const runBtn = document.querySelector('#run_query');
+    const queryInput = document.querySelector('#query_input');
+    const chatContainer = document.querySelector('#chat_container');
+    const historyList = document.querySelector('#history_list');
+
+    // ===============================
+    // Persistent Query History
+    // ===============================
+    let queryHistory = JSON.parse(localStorage.getItem('nlp_query_history') || '[]');
+
+    function saveHistory() {
+        localStorage.setItem('nlp_query_history', JSON.stringify(queryHistory));
+    }
+
+    function renderHistory() {
+        historyList.innerHTML = '';
+        queryHistory.forEach((query, index) => {
+            const item = document.createElement('div');
+            item.style.display = 'flex';
+            item.style.alignItems = 'center';
+            item.style.justifyContent = 'space-between';
+
+            // Query Text
+            const text = document.createElement('span');
+            text.textContent = query;
+            text.style.cursor = 'pointer';
+            text.onclick = () => {
+                queryInput.value = query;
+                runQuery(query);
+            };
+
+            // ❌ Delete Button
+            const del = document.createElement('span');
+            del.innerHTML = '&times;';
+            del.style.cursor = 'pointer';
+            del.style.marginLeft = '8px';
+            del.style.color = '#969696';
+            del.style.fontSize = '20px';
+            del.style.fontWeight = '600';
+            del.title = 'Remove from history';
+            del.onclick = (e) => {
+                e.stopPropagation();
+                queryHistory.splice(index, 1);
+                saveHistory();
+                renderHistory();
+            };
+
+            item.appendChild(text);
+            item.appendChild(del);
+            historyList.appendChild(item);
+        });
+    }
+
+    // ===============================
+    // Chat Handling
+    // ===============================
+    function addMessage(message, type, isHTML=false) {
+        const msg = document.createElement('div');
+        msg.className = 'chat-bubble ' + (type === 'user' ? 'chat-user ms-auto' : 'chat-bot me-auto');
+        msg.innerHTML = isHTML ? message : message.replace(/\n/g, '<br>');
+        chatContainer.appendChild(msg);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function addToHistory(query) {
+        if (queryHistory.includes(query)) return;
+        queryHistory.unshift(query);
+        if (queryHistory.length > 50) queryHistory.pop(); // limit stored queries
+        saveHistory();
+        renderHistory();
+    }
+
+    async function runQuery(query) {
+        if (!query.trim()) return;
+        addMessage(query, 'user');
+        queryInput.value = '';
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'chat-bubble chat-bot me-auto';
+        loadingMsg.textContent = '⏳ Thinking...';
+        chatContainer.appendChild(loadingMsg);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        try {
+            const response = await fetch('/nlp/run_query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ query }),
+            });
+            const data = await response.json();
+            loadingMsg.remove();
+            const hasTable = (typeof data.result === 'string') && (data.result.indexOf('<table') !== -1);
+            if (hasTable) addMessage(data.result, 'bot', true);
+            else addMessage(data.result || 'No result found.', 'bot');
+            addToHistory(query);
+        } catch (err) {
+            loadingMsg.remove();
+            addMessage('⚠️ Error: ' + err.message, 'bot');
+        }
+    }
+
+    // ===============================
+    // ⚡ Event Bindings
+    // ===============================
+    runBtn.onclick = () => runQuery(queryInput.value);
+    queryInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') runQuery(queryInput.value);
+    });
+
+    // Load history on page load
+    renderHistory();
+    ]]>
+            </script>
+
+        </t>
+    </template>
+
+    <!-- Menu and Action Setup -->
+    <menuitem id="menu_ai_tools_root" name="OQuery" web_icon="nlp_query_assistant,static/description/icon.png"
+              sequence="10"/>
+    <record id="action_nlp_query_page" model="ir.actions.act_url">
+        <field name="name">NLP Query Assistant</field>
+        <field name="type">ir.actions.act_url</field>
+        <field name="url">/nlp/query_page</field>
+        <field name="target">self</field>
+    </record>
+    <menuitem id="menu_nlp_query_page"
+              name="NLP Query Assistant"
+              parent="menu_ai_tools_root"
+              action="action_nlp_query_page"
+              sequence="1"/>
+</odoo>
